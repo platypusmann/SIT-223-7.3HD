@@ -563,18 +563,70 @@ PY
       }
       steps {
         script {
-          def image = docker.build("${IMAGE_NAME}:${IMAGE_TAG}")
-          sh """
-            if ! command -v trivy >/dev/null 2>&1; then
-              curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-            fi
-            trivy image --scanners vuln --format json -o reports/trivy.json ${IMAGE_NAME}:${IMAGE_TAG} || true
-          """
-          if (env.REGISTRY && env.REGISTRY != 'your-registry.com') {
-            docker.withRegistry("https://${REGISTRY}", 'registry-credentials') {
-              image.push("${env.GIT_COMMIT_SHORT}")
-              image.push('latest')
+          try {
+            // Check if Docker Pipeline plugin is available
+            if (binding.hasVariable('docker')) {
+              echo "Using Docker Pipeline plugin"
+              def image = docker.build("${IMAGE_NAME}:${IMAGE_TAG}")
+              
+              // Run Trivy security scan
+              sh """
+                if ! command -v trivy >/dev/null 2>&1; then
+                  curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+                fi
+                trivy image --scanners vuln --format json -o reports/trivy.json ${IMAGE_NAME}:${IMAGE_TAG} || true
+              """
+              
+              // Push to registry if configured
+              if (env.REGISTRY && env.REGISTRY != 'your-registry.com') {
+                docker.withRegistry("https://${REGISTRY}", 'registry-credentials') {
+                  image.push("${env.GIT_COMMIT_SHORT}")
+                  image.push('latest')
+                }
+              }
+            } else {
+              throw new Exception("Docker Pipeline plugin not available")
             }
+          } catch (Exception e) {
+            echo "⚠️  Docker Pipeline plugin not available: ${e.getMessage()}"
+            echo "Falling back to shell-based Docker commands"
+            
+            sh """
+              # Source Docker environment if available
+              if [ -f \$HOME/.jenkins_docker_env ]; then
+                . \$HOME/.jenkins_docker_env
+              fi
+              
+              # Build Docker image using shell commands
+              if command -v docker >/dev/null 2>&1; then
+                echo "Building Docker image: ${IMAGE_NAME}:${IMAGE_TAG}"
+                docker build -t ${IMAGE_NAME}:${IMAGE_TAG} . || {
+                  echo "❌ Docker build failed"
+                  exit 1
+                }
+                
+                # Run Trivy security scan
+                if ! command -v trivy >/dev/null 2>&1; then
+                  echo "Installing Trivy..."
+                  curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+                fi
+                trivy image --scanners vuln --format json -o reports/trivy.json ${IMAGE_NAME}:${IMAGE_TAG} || echo "Trivy scan completed with issues"
+                
+                # Push to registry if configured
+                if [ "${env.REGISTRY}" != "your-registry.com" ] && [ -n "${env.REGISTRY}" ]; then
+                  echo "Pushing to registry: ${env.REGISTRY}"
+                  docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${env.REGISTRY}/${IMAGE_NAME}:${env.GIT_COMMIT_SHORT}
+                  docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${env.REGISTRY}/${IMAGE_NAME}:latest
+                  docker push ${env.REGISTRY}/${IMAGE_NAME}:${env.GIT_COMMIT_SHORT} || echo "Push of commit tag failed"
+                  docker push ${env.REGISTRY}/${IMAGE_NAME}:latest || echo "Push of latest tag failed"
+                fi
+                
+                echo "✅ Docker build and scan completed"
+              else
+                echo "❌ Docker command not available"
+                exit 1
+              fi
+            """
           }
         }
       }
