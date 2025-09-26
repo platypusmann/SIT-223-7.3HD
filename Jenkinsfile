@@ -49,13 +49,16 @@ pipeline {
               
               # Install pip if not available
               echo "Checking pip availability..."
-              if python3.11 -m pip --version &> /dev/null; then
-                echo "✅ pip already available via 'python3.11 -m pip'"
+              
+              # Test if pip module exists
+              if python3.11 -c "import pip" 2>/dev/null; then
+                echo "✅ pip module available"
               else
-                echo "⚠️  pip not available, installing..."
+                echo "⚠️  pip module not found, installing..."
                 
                 # Try ensurepip first
-                if python3.11 -m ensurepip --upgrade --user 2>/dev/null; then
+                echo "Trying ensurepip..."
+                if python3.11 -m ensurepip --upgrade --user; then
                   echo "✅ pip installed via ensurepip"
                 else
                   echo "ensurepip failed, trying get-pip.py..."
@@ -74,16 +77,20 @@ pipeline {
                 fi
               fi
               
-              # Always create pip3.11 wrapper for consistency
-              echo '#!/bin/bash' > $HOME/.local/bin/pip3.11
-              echo 'python3.11 -m pip "$@"' >> $HOME/.local/bin/pip3.11
-              chmod +x $HOME/.local/bin/pip3.11
-              
-              # Verify pip is working
-              if python3.11 -m pip --version &> /dev/null; then
-                echo "✅ pip3.11 wrapper created and working: $(python3.11 -m pip --version)"
+              # Verify pip is working before creating wrapper
+              echo "Verifying pip installation..."
+              if python3.11 -m pip --version; then
+                echo "✅ pip is working: $(python3.11 -m pip --version)"
+                
+                # Create pip3.11 wrapper
+                echo '#!/bin/bash' > $HOME/.local/bin/pip3.11
+                echo 'python3.11 -m pip "$@"' >> $HOME/.local/bin/pip3.11
+                chmod +x $HOME/.local/bin/pip3.11
+                echo "✅ pip3.11 wrapper created"
               else
-                echo "❌ ERROR: pip still not working after installation"
+                echo "❌ ERROR: pip still not working after installation attempts"
+                python3.11 -c "import sys; print('Python path:', sys.path)"
+                python3.11 -c "import sys; print('Python executable:', sys.executable)"
                 exit 1
               fi
             else
