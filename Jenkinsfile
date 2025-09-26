@@ -245,13 +245,23 @@ pipeline {
             echo
             
             # Set Docker availability flag for later stages
-            if [ -n "$DOCKER_PATH" ] && $DOCKER_CMD info &> /dev/null 2>&1; then
-              echo "DOCKER_AVAILABLE=true" > $HOME/.jenkins_docker_env
-              echo "✅ Docker fully functional - Docker stages will run"
+            DOCKER_WORKING=false
+            if [ -n "$DOCKER_PATH" ]; then
+              echo "Testing Docker functionality..."
+              if $DOCKER_CMD info &> /dev/null 2>&1; then
+                echo "DOCKER_AVAILABLE=true" > $HOME/.jenkins_docker_env
+                echo "✅ Docker fully functional - Docker stages will run"
+                DOCKER_WORKING=true
+              else
+                echo "DOCKER_AVAILABLE=false" > $HOME/.jenkins_docker_env  
+                echo "⚠️  Docker found but not functional - Docker stages will be skipped"
+              fi
             else
               echo "DOCKER_AVAILABLE=false" > $HOME/.jenkins_docker_env
-              echo "⚠️  Docker not available - Docker stages will be skipped"
+              echo "⚠️  Docker not found - Docker stages will be skipped"
             fi
+            
+            echo "Final Docker status: DOCKER_WORKING=$DOCKER_WORKING"
           '''
         }
         script {
@@ -263,6 +273,41 @@ pipeline {
           env.DOCKER_AVAILABLE = dockerAvailable
           echo "Pipeline Docker availability: ${env.DOCKER_AVAILABLE}"
         }
+        
+        // Temporary Docker diagnostic
+        echo "=== DOCKER DIAGNOSTIC DETAILS ==="
+        sh '''
+          echo "Detailed Docker diagnostic:"
+          echo "User: $(whoami)"
+          echo "Groups: $(groups)"
+          echo "PATH: $PATH"
+          
+          # Check all possible Docker locations
+          for loc in /usr/bin/docker /usr/local/bin/docker /bin/docker /snap/bin/docker; do
+            if [ -x "$loc" ]; then
+              echo "Docker found at: $loc"
+              echo "Version: $($loc --version)"
+              if $loc info >/dev/null 2>&1; then
+                echo "Daemon accessible: YES"
+              else
+                echo "Daemon accessible: NO"
+              fi
+            fi
+          done
+          
+          # Check Docker socket
+          if [ -S /var/run/docker.sock ]; then
+            echo "Docker socket: EXISTS"
+            ls -la /var/run/docker.sock
+          else
+            echo "Docker socket: NOT FOUND"
+          fi
+          
+          # Check Docker processes
+          echo "Docker processes:"
+          ps aux | grep docker | grep -v grep || echo "No Docker processes"
+        '''
+        
         sh """
           # Source Python environment if available
           if [ -f \$HOME/.jenkins_python_env ]; then
@@ -595,10 +640,17 @@ PY
               # Source Docker environment if available
               if [ -f \$HOME/.jenkins_docker_env ]; then
                 . \$HOME/.jenkins_docker_env
+                echo "Docker environment loaded: DOCKER_AVAILABLE=\$DOCKER_AVAILABLE"
+              fi
+              
+              # Double-check Docker availability before proceeding
+              if [ "\$DOCKER_AVAILABLE" != "true" ]; then
+                echo "❌ Docker marked as unavailable in environment"
+                exit 1
               fi
               
               # Build Docker image using shell commands
-              if command -v docker >/dev/null 2>&1; then
+              if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
                 echo "Building Docker image: ${IMAGE_NAME}:${IMAGE_TAG}"
                 docker build -t ${IMAGE_NAME}:${IMAGE_TAG} . || {
                   echo "❌ Docker build failed"
