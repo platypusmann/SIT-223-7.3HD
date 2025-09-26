@@ -35,91 +35,39 @@ pipeline {
             echo "PATH: $PATH"
             echo
             
-            # Check and install Python 3.11 (no sudo required)
+            # Check Python 3.11 availability
             echo "Checking Python 3.11..."
-            if ! command -v python3.11 &> /dev/null; then
-              echo "❌ Python 3.11 not found, attempting user-space installation..."
+            if command -v python3.11 &> /dev/null; then
+              echo "✅ Python 3.11 already available: $(python3.11 --version)"
+              echo "Location: $(which python3.11)"
               
-              # Check if we have a working Python to bootstrap with
-              BOOTSTRAP_PYTHON=""
-              for py in python3.10 python3.9 python3.8 python3 python; do
-                if command -v $py &> /dev/null && $py --version 2>&1 | grep -q "Python 3"; then
-                  BOOTSTRAP_PYTHON=$py
-                  echo "Found bootstrap Python: $($py --version)"
-                  break
-                fi
-              done
-              
-              if [ -z "$BOOTSTRAP_PYTHON" ]; then
-                echo "❌ ERROR: No Python 3.x found to bootstrap installation"
-                echo "Available Python versions:"
-                ls -la /usr/bin/python* 2>/dev/null || echo "No Python found"
-                exit 1
-              fi
-              
-              # Install pyenv if not present
-              if [ ! -d "$HOME/.pyenv" ]; then
-                echo "Installing pyenv..."
-                curl -fsSL https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer | bash
-                export PATH="$HOME/.pyenv/bin:$PATH"
-                eval "$(pyenv init --path)"
-                eval "$(pyenv init -)"
-              else
-                echo "pyenv already installed"
-                export PATH="$HOME/.pyenv/bin:$PATH"
-                eval "$(pyenv init --path)"
-                eval "$(pyenv init -)"
-              fi
-              
-              # Install Python 3.11 via pyenv
-              echo "Installing Python 3.11.9 via pyenv..."
-              pyenv install -s 3.11.9
-              pyenv global 3.11.9
-              
-              # Update PATH to include pyenv Python
-              export PATH="$HOME/.pyenv/versions/3.11.9/bin:$PATH"
-              
-              # Create symlink in a location that's likely in PATH
+              # Ensure it's in our PATH
               mkdir -p $HOME/.local/bin
-              ln -sf $HOME/.pyenv/versions/3.11.9/bin/python3.11 $HOME/.local/bin/python3.11
-              ln -sf $HOME/.pyenv/versions/3.11.9/bin/pip3.11 $HOME/.local/bin/pip3.11
-              export PATH="$HOME/.local/bin:$PATH"
-              
-              # Verify installation
-              if ! command -v python3.11 &> /dev/null; then
-                echo "❌ ERROR: Python 3.11 installation failed!"
-                echo "Trying alternative approach with portable Python..."
-                
-                # Alternative: Download portable Python (Linux x64)
-                if [ "$(uname -m)" = "x86_64" ] && [ "$(uname)" = "Linux" ]; then
-                  echo "Downloading portable Python 3.11..."
-                  mkdir -p $HOME/.local/python3.11
-                  cd $HOME/.local/python3.11
-                  
-                  # Download Python 3.11 from python.org (if available)
-                  wget -q https://www.python.org/ftp/python/3.11.9/Python-3.11.9.tgz || {
-                    echo "❌ ERROR: Could not download Python source"
-                    exit 1
-                  }
-                  
-                  tar -xzf Python-3.11.9.tgz
-                  cd Python-3.11.9
-                  
-                  # Build Python locally without sudo
-                  ./configure --prefix=$HOME/.local/python3.11 --enable-optimizations
-                  make -j$(nproc)
-                  make install
-                  
-                  # Create symlinks
-                  ln -sf $HOME/.local/python3.11/bin/python3.11 $HOME/.local/bin/python3.11
-                  ln -sf $HOME/.local/python3.11/bin/pip3.11 $HOME/.local/bin/pip3.11
-                  
-                  cd $WORKSPACE
-                else
-                  echo "❌ ERROR: Cannot install Python 3.11 without sudo on this system"
-                  exit 1
-                fi
+              if [ "$(which python3.11)" != "$HOME/.local/bin/python3.11" ]; then
+                ln -sf $(which python3.11) $HOME/.local/bin/python3.11
               fi
+              
+              # Check for pip3.11 or create link
+              if ! command -v pip3.11 &> /dev/null; then
+                if python3.11 -m pip --version &> /dev/null; then
+                  echo "pip available via 'python3.11 -m pip'"
+                  # Create a pip3.11 wrapper script
+                  echo '#!/bin/bash' > $HOME/.local/bin/pip3.11
+                  echo 'python3.11 -m pip "$@"' >> $HOME/.local/bin/pip3.11
+                  chmod +x $HOME/.local/bin/pip3.11
+                else
+                  echo "⚠️  pip not immediately available, will bootstrap in next stage"
+                fi
+              else
+                echo "✅ pip3.11 found: $(pip3.11 --version)"
+              fi
+            else
+              echo "❌ Python 3.11 not found!"
+              echo "Available Python versions:"
+              ls -la /usr/bin/python* 2>/dev/null || echo "No Python found"
+              echo "❌ ERROR: Python 3.11 is required but not available"
+              echo "SOLUTION: Install Python 3.11 on the Jenkins server"
+              exit 1
             fi
             
             # Final verification and PATH setup
