@@ -47,43 +47,44 @@ pipeline {
                 ln -sf $(which python3.11) $HOME/.local/bin/python3.11
               fi
               
-              # Check for pip3.11 or install/create it
-              if ! command -v pip3.11 &> /dev/null; then
-                if python3.11 -m pip --version &> /dev/null; then
-                  echo "✅ pip available via 'python3.11 -m pip'"
-                  # Create a pip3.11 wrapper script
-                  echo '#!/bin/bash' > $HOME/.local/bin/pip3.11
-                  echo 'python3.11 -m pip "$@"' >> $HOME/.local/bin/pip3.11
-                  chmod +x $HOME/.local/bin/pip3.11
-                else
-                  echo "⚠️  pip not available, attempting to install..."
-                  
-                  # Try ensurepip first
-                  if python3.11 -m ensurepip --upgrade --user 2>/dev/null; then
-                    echo "✅ pip installed via ensurepip"
-                  else
-                    echo "ensurepip failed, trying get-pip.py..."
-                    # Download and install pip
-                    curl -fsSL --retry 3 --retry-delay 5 https://bootstrap.pypa.io/get-pip.py -o get-pip.py || {
-                      echo "❌ ERROR: Cannot download get-pip.py"
-                      exit 1
-                    }
-                    
-                    python3.11 get-pip.py --user || {
-                      echo "❌ ERROR: get-pip.py installation failed"
-                      exit 1
-                    }
-                    rm -f get-pip.py
-                    echo "✅ pip installed via get-pip.py"
-                  fi
-                  
-                  # Create pip3.11 wrapper
-                  echo '#!/bin/bash' > $HOME/.local/bin/pip3.11
-                  echo 'python3.11 -m pip "$@"' >> $HOME/.local/bin/pip3.11
-                  chmod +x $HOME/.local/bin/pip3.11
-                fi
+              # Install pip if not available
+              echo "Checking pip availability..."
+              if python3.11 -m pip --version &> /dev/null; then
+                echo "✅ pip already available via 'python3.11 -m pip'"
               else
-                echo "✅ pip3.11 found: $(pip3.11 --version)"
+                echo "⚠️  pip not available, installing..."
+                
+                # Try ensurepip first
+                if python3.11 -m ensurepip --upgrade --user 2>/dev/null; then
+                  echo "✅ pip installed via ensurepip"
+                else
+                  echo "ensurepip failed, trying get-pip.py..."
+                  # Download and install pip
+                  curl -fsSL --retry 3 --retry-delay 5 https://bootstrap.pypa.io/get-pip.py -o get-pip.py || {
+                    echo "❌ ERROR: Cannot download get-pip.py"
+                    exit 1
+                  }
+                  
+                  python3.11 get-pip.py --user || {
+                    echo "❌ ERROR: get-pip.py installation failed"
+                    exit 1
+                  }
+                  rm -f get-pip.py
+                  echo "✅ pip installed via get-pip.py"
+                fi
+              fi
+              
+              # Always create pip3.11 wrapper for consistency
+              echo '#!/bin/bash' > $HOME/.local/bin/pip3.11
+              echo 'python3.11 -m pip "$@"' >> $HOME/.local/bin/pip3.11
+              chmod +x $HOME/.local/bin/pip3.11
+              
+              # Verify pip is working
+              if python3.11 -m pip --version &> /dev/null; then
+                echo "✅ pip3.11 wrapper created and working: $(python3.11 -m pip --version)"
+              else
+                echo "❌ ERROR: pip still not working after installation"
+                exit 1
               fi
             else
               echo "❌ Python 3.11 not found!"
@@ -113,46 +114,63 @@ pipeline {
               exit 1
             fi
             
-            # Check Docker
+            # Check Docker (detailed diagnostics)
             echo "Checking Docker..."
+            echo "Current PATH: $PATH"
             
             # Look for Docker in common locations
             DOCKER_PATH=""
-            for docker_loc in /usr/bin/docker /usr/local/bin/docker /bin/docker; do
+            echo "Searching for Docker executable..."
+            for docker_loc in /usr/bin/docker /usr/local/bin/docker /bin/docker /snap/bin/docker; do
+              echo "  Checking: $docker_loc"
               if [ -x "$docker_loc" ]; then
                 DOCKER_PATH="$docker_loc"
+                echo "  ✅ Found executable Docker at: $docker_loc"
                 break
+              else
+                echo "  ❌ Not found or not executable"
               fi
             done
             
+            # Also check via command -v
+            if [ -z "$DOCKER_PATH" ] && command -v docker &> /dev/null; then
+              DOCKER_PATH="$(command -v docker)"
+              echo "✅ Docker found via command -v at: $DOCKER_PATH"
+            fi
+            
             if [ -n "$DOCKER_PATH" ]; then
-              echo "✅ Docker found at: $DOCKER_PATH"
+              echo "✅ Docker executable found at: $DOCKER_PATH"
               # Create symlink for easy access
               ln -sf "$DOCKER_PATH" $HOME/.local/bin/docker
               DOCKER_CMD="$DOCKER_PATH"
-            elif command -v docker &> /dev/null; then
-              echo "✅ Docker found in PATH: $(which docker)"
-              DOCKER_CMD="docker"
+              
+              # Test Docker daemon access
+              echo "Testing Docker daemon access..."
+              if $DOCKER_CMD info &> /dev/null; then
+                echo "✅ Docker daemon accessible: $($DOCKER_CMD --version)"
+              else
+                echo "⚠️  Docker found but daemon not accessible"
+                echo "Docker version: $($DOCKER_CMD --version 2>/dev/null || echo 'Cannot get version')"
+                echo "Current user groups: $(groups)"
+                echo "Docker socket permissions:"
+                ls -la /var/run/docker.sock 2>/dev/null || echo "Docker socket not found at /var/run/docker.sock"
+                echo "Docker daemon status:"
+                systemctl is-active docker 2>/dev/null || echo "Cannot check Docker daemon status"
+                echo "⚠️  Docker stages will be skipped"
+              fi
             else
-              echo "❌ ERROR: Docker not found!"
-              echo "Checked locations: /usr/bin/docker, /usr/local/bin/docker, /bin/docker"
-              echo "PATH: $PATH"
-              echo "SOLUTION: Contact Jenkins admin to install Docker"
-              exit 1
+              echo "❌ Docker not found anywhere!"
+              echo "Searched locations:"
+              echo "  - /usr/bin/docker"
+              echo "  - /usr/local/bin/docker" 
+              echo "  - /bin/docker"
+              echo "  - /snap/bin/docker"
+              echo "  - PATH search via 'command -v docker'"
+              echo "Current PATH: $PATH"
+              echo "Available binaries in /usr/bin:"
+              ls -la /usr/bin/ | grep -i docker | head -5 || echo "No docker-related binaries found"
+              echo "⚠️  Docker stages will be skipped - contact admin to install Docker"
             fi
-            
-            # Test Docker daemon access
-            echo "Testing Docker daemon access..."
-            if ! $DOCKER_CMD info &> /dev/null; then
-              echo "❌ ERROR: Docker daemon not accessible!"
-              echo "Current user groups: $(groups)"
-              echo "Docker socket permissions:"
-              ls -la /var/run/docker.sock 2>/dev/null || echo "Docker socket not found"
-              echo "SOLUTION: Add Jenkins user to docker group: sudo usermod -aG docker $(whoami)"
-              echo "Or ensure Docker is running and accessible"
-              exit 1
-            fi
-            echo "✅ Docker accessible: $($DOCKER_CMD --version)"
             
             # Check network connectivity
             echo "Checking network connectivity..."
@@ -163,7 +181,25 @@ pipeline {
             fi
             echo "✅ Network connectivity OK"
             echo
+            
+            # Set Docker availability flag for later stages
+            if [ -n "$DOCKER_PATH" ] && $DOCKER_CMD info &> /dev/null 2>&1; then
+              echo "DOCKER_AVAILABLE=true" > $HOME/.jenkins_docker_env
+              echo "✅ Docker fully functional - Docker stages will run"
+            else
+              echo "DOCKER_AVAILABLE=false" > $HOME/.jenkins_docker_env
+              echo "⚠️  Docker not available - Docker stages will be skipped"
+            fi
           '''
+        }
+        script {
+          // Set pipeline environment variable for Docker availability
+          def dockerAvailable = sh(
+            returnStdout: true,
+            script: 'if [ -f $HOME/.jenkins_docker_env ]; then grep DOCKER_AVAILABLE $HOME/.jenkins_docker_env | cut -d= -f2; else echo false; fi'
+          ).trim()
+          env.DOCKER_AVAILABLE = dockerAvailable
+          echo "Pipeline Docker availability: ${env.DOCKER_AVAILABLE}"
         }
         sh """
           # Source Python environment if available
@@ -373,6 +409,9 @@ PY
     }
 
     stage('Docker Build + Trivy') {
+      when {
+        environment name: 'DOCKER_AVAILABLE', value: 'true'
+      }
       steps {
         script {
           def image = docker.build("${IMAGE_NAME}:${IMAGE_TAG}")
@@ -393,6 +432,9 @@ PY
     }
 
     stage('Deploy to Staging') {
+      when {
+        environment name: 'DOCKER_AVAILABLE', value: 'true'
+      }
       steps {
         sh """
           # prefer docker compose v2; fallback to docker-compose
@@ -416,6 +458,9 @@ PY
     }
 
     stage('Integration Smoke') {
+      when {
+        environment name: 'DOCKER_AVAILABLE', value: 'true'
+      }
       steps {
         sh """
           set -e
