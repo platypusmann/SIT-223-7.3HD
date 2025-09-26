@@ -275,32 +275,39 @@ pipeline {
           echo "Python version: \$(python3.11 --version)"
           
           # Try multiple methods to ensure pip is available
-          if ! python3.11 -m pip --version &> /dev/null; then
+          echo "Testing pip availability..."
+          if python3.11 -m pip --version >/dev/null 2>&1; then
+            echo "✅ pip is already working: \$(python3.11 -m pip --version)"
+          else
             echo "pip not available, attempting installation..."
             
-            # Method 1: ensurepip
-            python3.11 -m ensurepip --upgrade --user 2>/dev/null || {
+            # Method 1: ensurepip with --break-system-packages
+            if python3.11 -m ensurepip --upgrade --user --break-system-packages 2>/dev/null; then
+              echo "✅ pip installed via ensurepip"
+            else
               echo "ensurepip failed, trying get-pip.py..."
               
-              # Method 2: get-pip.py
+              # Method 2: get-pip.py with --break-system-packages
               curl -fsSL --retry 3 --retry-delay 5 https://bootstrap.pypa.io/get-pip.py -o get-pip.py || {
                 echo "❌ ERROR: Cannot download get-pip.py"
                 echo "SOLUTION: Check network connectivity or contact admin"
                 exit 1
               }
               
-              python3.11 get-pip.py --user || {
+              if python3.11 get-pip.py --user --break-system-packages; then
+                echo "✅ pip installed via get-pip.py"
+              else
                 echo "❌ ERROR: get-pip.py installation failed"
                 exit 1
-              }
+              fi
               rm -f get-pip.py
-            }
-          fi
-          
-          # Verify pip is now working
-          if ! python3.11 -m pip --version &> /dev/null; then
-            echo "❌ ERROR: pip still not working after installation attempts"
-            exit 1
+            fi
+            
+            # Verify pip is now working
+            if ! python3.11 -m pip --version >/dev/null 2>&1; then
+              echo "❌ ERROR: pip still not working after installation attempts"
+              exit 1
+            fi
           fi
           echo "✅ pip available: \$(python3.11 -m pip --version)"
           
