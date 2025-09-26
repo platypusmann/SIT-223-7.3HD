@@ -27,8 +27,11 @@ COPY app/ ./app/
 COPY etl/ ./etl/
 COPY expectations/ ./expectations/
 
-# Create directories for data
-RUN mkdir -p data/raw data/clean
+# Copy sample data for demo/testing
+COPY data/raw_sample/ ./data/raw_sample/
+
+# Create directories for data and reports
+RUN mkdir -p data/raw data/clean reports
 
 # Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser

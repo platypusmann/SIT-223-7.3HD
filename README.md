@@ -1,4 +1,16 @@
 
+# SIT-223-7.3HD – Instacart ETL + FastAPI + Jenkins
+
+A production-ready ETL pipeline and REST API service for processing Instacart market basket data, built with Python, FastAPI, and automated CI/CD using Jenkins. The system handles CSV data cleaning, validation, filtering, and provides RESTful endpoints for data access with comprehensive testing and quality assurance.
+
+## 📊 Dataset Note
+
+This project processes the **Kaggle Instacart Market Basket Analysis** dataset. Raw CSV files are **not included** in this repository - download them from Kaggle and place in `data/raw/` directory before running the ETL pipeline.
+
+**Sample Data**: A small sample dataset (~60 orders, 34 products) is included in `data/raw_sample/` for testing and development purposes.
+
+## 🚀 Run Locally
+
 ```bash
 # Setup environment
 python -m venv .venv

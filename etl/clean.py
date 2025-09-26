@@ -73,7 +73,7 @@ class CSVCleaner:
                 cleaned_df[numeric_columns].mean()
             )
         elif missing_strategy == "fill_forward":
-            cleaned_df = cleaned_df.fillna(method="ffill")
+            cleaned_df = cleaned_df.ffill()
         
         # Strip whitespace from string columns
         if config.get("strip_whitespace", True):

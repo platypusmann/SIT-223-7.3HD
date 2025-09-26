@@ -1,4 +1,4 @@
-"""Data validation schemas using Pandera."""
+"""Data validation schemas using Pandera for Instacart dataset."""
 
 import pandera as pa
 from pandera import Column, DataFrameSchema, Check
@@ -7,117 +7,143 @@ import pandas as pd
 from typing import Optional
 
 
-class BaseCSVSchema(pa.DataFrameModel):
-    """Base schema for CSV data validation."""
+class BaseInstacartSchema(pa.DataFrameModel):
+    """Base schema for Instacart data validation."""
     
     class Config:
         """Pandera configuration."""
-        strict = True
+        strict = False  # Allow extra columns
         coerce = True
 
 
-class SampleDataSchema(BaseCSVSchema):
-    """Example schema for sample CSV data.
+class OrdersSchema(BaseInstacartSchema):
+    """Schema for orders.csv data."""
     
-    This is a template that can be modified based on your specific data requirements.
-    """
-    
-    # Example columns - modify these based on your actual data structure
-    id: Series[int] = pa.Field(ge=1, description="Unique identifier")
-    name: Series[str] = pa.Field(str_length={"min_val": 1, "max_val": 100}, description="Name field")
-    email: Optional[Series[str]] = pa.Field(
-        nullable=True,
-        regex=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
-        description="Email address"
+    order_id: Series[int] = pa.Field(ge=1, description="Unique order identifier")
+    user_id: Series[int] = pa.Field(ge=1, description="User identifier")
+    eval_set: Series[str] = pa.Field(isin=["prior", "train", "test"], description="Evaluation set")
+    order_number: Series[int] = pa.Field(ge=1, description="Order sequence number for user")
+    order_dow: Series[int] = pa.Field(ge=0, le=6, description="Day of week (0=Sunday)")
+    order_hour_of_day: Series[int] = pa.Field(ge=0, le=23, description="Hour of day")
+    days_since_prior_order: Optional[Series[float]] = pa.Field(
+        ge=0, nullable=True, description="Days since previous order"
     )
-    age: Optional[Series[int]] = pa.Field(ge=0, le=150, nullable=True, description="Age in years")
-    created_date: Series[pd.Timestamp] = pa.Field(description="Creation timestamp")
 
 
-class CleanedDataSchema(BaseCSVSchema):
-    """Schema for cleaned/processed data."""
+class ProductsSchema(BaseInstacartSchema):
+    """Schema for products.csv data."""
     
-    # Define the expected structure after cleaning
-    id: Series[int] = pa.Field(ge=1, unique=True, description="Unique identifier")
-    name: Series[str] = pa.Field(str_length={"min_val": 1}, description="Cleaned name field")
-    email: Optional[Series[str]] = pa.Field(
-        nullable=True,
-        regex=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
-        description="Validated email address"
-    )
-    age: Optional[Series[int]] = pa.Field(ge=0, le=150, nullable=True, description="Validated age")
-    created_date: Series[pd.Timestamp] = pa.Field(description="Parsed creation timestamp")
+    product_id: Series[int] = pa.Field(ge=1, description="Unique product identifier")
+    product_name: Series[str] = pa.Field(str_length={"min_val": 1}, description="Product name")
+    aisle_id: Series[int] = pa.Field(ge=1, description="Aisle identifier")
+    department_id: Series[int] = pa.Field(ge=1, description="Department identifier")
+
+
+class AislesSchema(BaseInstacartSchema):
+    """Schema for aisles.csv data."""
     
-    @pa.check("name")
-    def name_not_empty(cls, series: Series[str]) -> Series[bool]:
-        """Check that name is not empty after stripping whitespace."""
-        return series.str.strip().str.len() > 0
+    aisle_id: Series[int] = pa.Field(ge=1, unique=True, description="Unique aisle identifier")
+    aisle: Series[str] = pa.Field(str_length={"min_val": 1}, description="Aisle name")
 
 
-class NumericDataSchema(BaseCSVSchema):
-    """Schema for numeric data validation."""
+class DepartmentsSchema(BaseInstacartSchema):
+    """Schema for departments.csv data."""
     
-    value: Series[float] = pa.Field(description="Numeric value")
-    category: Series[str] = pa.Field(isin=["A", "B", "C"], description="Category")
+    department_id: Series[int] = pa.Field(ge=1, unique=True, description="Unique department identifier")
+    department: Series[str] = pa.Field(str_length={"min_val": 1}, description="Department name")
+
+
+class OrderProductsSchema(BaseInstacartSchema):
+    """Schema for order_products__*.csv data."""
     
-    @pa.check("value")
-    def value_not_null(cls, series: Series[float]) -> Series[bool]:
-        """Check that values are not null."""
-        return ~series.isna()
+    order_id: Series[int] = pa.Field(ge=1, description="Order identifier")
+    product_id: Series[int] = pa.Field(ge=1, description="Product identifier")
+    add_to_cart_order: Series[int] = pa.Field(ge=1, description="Order in which product was added to cart")
+    reordered: Series[int] = pa.Field(isin=[0, 1], description="1 if reordered, 0 if not")
 
 
-def validate_dataframe(df: pd.DataFrame, schema_class: type) -> pd.DataFrame:
-    """Validate a DataFrame against a schema.
+def validate_instacart_data(df: pd.DataFrame, schema_class: type, filename: str = "") -> tuple[pd.DataFrame, list[str]]:
+    """Validate Instacart DataFrame against schema.
     
     Args:
         df: DataFrame to validate
-        schema_class: Pandera schema class to validate against
+        schema_class: Pandera schema class
+        filename: Optional filename for error context
         
     Returns:
-        Validated DataFrame
-        
-    Raises:
-        pandera.errors.SchemaError: If validation fails
+        Tuple of (validated_df, list_of_errors)
     """
+    errors = []
+    
     try:
-        validated_df = schema_class.validate(df)
-        return validated_df
+        # Validate with schema
+        validated_df = schema_class.validate(df, lazy=True)
+        
+        # Additional business logic checks
+        if "order_id" in df.columns:
+            if df["order_id"].duplicated().any():
+                errors.append("Duplicate order_id values found")
+        
+        if "product_id" in df.columns and "product_name" in df.columns:
+            # Check for products with same ID but different names
+            product_consistency = df.groupby("product_id")["product_name"].nunique()
+            inconsistent = product_consistency[product_consistency > 1]
+            if len(inconsistent) > 0:
+                errors.append(f"Inconsistent product names for {len(inconsistent)} product IDs")
+        
+        return validated_df, errors
+        
+    except pa.errors.SchemaErrors as e:
+        # Handle multiple validation errors
+        for error in e.schema_errors:
+            errors.append(f"{filename}: {error}")
+        return df, errors
     except pa.errors.SchemaError as e:
-        # Log the validation error details
-        error_msg = f"Schema validation failed: {e}"
-        raise pa.errors.SchemaError(error_msg) from e
+        errors.append(f"{filename}: {str(e)}")
+        return df, errors
+    except Exception as e:
+        errors.append(f"{filename}: Unexpected validation error: {str(e)}")
+        return df, errors
 
 
-def get_schema_summary(schema_class: type) -> dict:
-    """Get a summary of a schema's requirements.
+def get_validation_summary(df: pd.DataFrame, schema_class: type) -> dict:
+    """Get validation summary for a DataFrame.
     
     Args:
-        schema_class: Pandera schema class
+        df: DataFrame to analyze
+        schema_class: Schema class used for validation
         
     Returns:
-        Dictionary with schema information
+        Dictionary with validation summary
     """
-    schema_info = {
-        "schema_name": schema_class.__name__,
-        "columns": {},
-        "checks": []
+    _, errors = validate_instacart_data(df, schema_class)
+    
+    return {
+        "schema": schema_class.__name__,
+        "rows": len(df),
+        "columns": len(df.columns),
+        "errors": len(errors),
+        "error_details": errors,
+        "missing_values": df.isnull().sum().to_dict(),
+        "data_types": df.dtypes.to_dict()
     }
-    
-    # Get column information
-    for field_name, field_info in schema_class.__annotations__.items():
-        if hasattr(schema_class, field_name):
-            field = getattr(schema_class, field_name)
-            if hasattr(field, "field_info"):
-                schema_info["columns"][field_name] = {
-                    "type": str(field_info),
-                    "nullable": getattr(field.field_info, "nullable", False),
-                    "description": getattr(field.field_info, "description", "")
-                }
-    
-    return schema_info
 
 
-# Example usage schemas - create instances for common validation patterns
-SAMPLE_SCHEMA = SampleDataSchema
-CLEANED_SCHEMA = CleanedDataSchema
-NUMERIC_SCHEMA = NumericDataSchema
+# Schema mapping for different Instacart files
+INSTACART_SCHEMAS = {
+    "orders.csv": OrdersSchema,
+    "products.csv": ProductsSchema,
+    "aisles.csv": AislesSchema, 
+    "departments.csv": DepartmentsSchema,
+    "order_products__prior.csv": OrderProductsSchema,
+    "order_products__train.csv": OrderProductsSchema,
+}
+
+# Cleaned data schemas (same structure but lowercase columns)
+CLEANED_SCHEMAS = {
+    "cleaned_orders.csv": OrdersSchema,
+    "cleaned_products.csv": ProductsSchema,
+    "cleaned_aisles.csv": AislesSchema,
+    "cleaned_departments.csv": DepartmentsSchema,
+    "cleaned_order_products__prior.csv": OrderProductsSchema,
+}
