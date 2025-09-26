@@ -6,6 +6,8 @@ A production-ready ETL pipeline and REST API service for processing Instacart ma
 
 This project processes the **Kaggle Instacart Market Basket Analysis** dataset. Raw CSV files are **not included** in this repository - download them from Kaggle and place in `data/raw/` directory before running the ETL pipeline.
 
+**Sample Data**: A small sample dataset (~60 orders, 34 products) is included in `data/raw_sample/` for testing and development purposes.
+
 ## 🚀 Run Locally
 
 ```bash
@@ -14,11 +16,30 @@ python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -e .[dev]
 
-# Run ETL pipeline
+# Run ETL pipeline with sample data (for testing)
+python -m etl.clean --sample
+
+# Run ETL pipeline with full data (requires Kaggle download)
 python -m etl.clean
 
 # Start FastAPI server
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### ETL Pipeline Options
+
+```bash
+# Use sample data for quick testing
+python -m etl.clean --sample
+
+# Use full dataset (default)
+python -m etl.clean
+
+# Custom input/output directories
+python -m etl.clean --raw-dir /path/to/raw --clean-dir /path/to/clean
+
+# Enable debug logging
+python -m etl.clean --sample --log-level DEBUG
 ```
 
 ## 🐳 Docker Run

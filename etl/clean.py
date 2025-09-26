@@ -150,3 +150,117 @@ class CSVCleaner:
             "memory_usage": df.memory_usage(deep=True).sum(),
             "numeric_summary": df.describe().to_dict() if len(df.select_dtypes(include=[np.number]).columns) > 0 else {}
         }
+
+
+def process_instacart_data(raw_data_dir: str = "data/raw", clean_data_dir: str = "data/clean"):
+    """Process Instacart dataset files.
+    
+    Args:
+        raw_data_dir: Directory containing raw CSV files
+        clean_data_dir: Directory for cleaned CSV files
+    """
+    cleaner = CSVCleaner(raw_data_dir=raw_data_dir, clean_data_dir=clean_data_dir)
+    
+    # Define expected Instacart files
+    instacart_files = [
+        "orders.csv",
+        "order_products__prior.csv", 
+        "products.csv",
+        "aisles.csv",
+        "departments.csv"
+    ]
+    
+    # Process each file
+    for filename in instacart_files:
+        try:
+            logger.info(f"Processing {filename}...")
+            
+            # Load the raw data
+            df = cleaner.load_csv(filename)
+            logger.info(f"Loaded {filename}: {df.shape}")
+            
+            # Get data summary before cleaning
+            summary_before = cleaner.get_data_summary(df)
+            logger.info(f"Before cleaning - Rows: {summary_before['shape'][0]}, "
+                       f"Columns: {summary_before['shape'][1]}, "
+                       f"Missing values: {sum(summary_before['missing_values'].values())}")
+            
+            # Clean the data
+            cleaned_df = cleaner.clean_dataframe(df, {
+                "remove_duplicates": True,
+                "missing_strategy": "drop" if filename == "orders.csv" else "fill_forward",
+                "strip_whitespace": True,
+                "lowercase_columns": True
+            })
+            
+            # Get data summary after cleaning
+            summary_after = cleaner.get_data_summary(cleaned_df)
+            logger.info(f"After cleaning - Rows: {summary_after['shape'][0]}, "
+                       f"Columns: {summary_after['shape'][1]}, "
+                       f"Missing values: {sum(summary_after['missing_values'].values())}")
+            
+            # Save cleaned data
+            output_filename = f"cleaned_{filename}"
+            output_path = cleaner.save_cleaned_csv(cleaned_df, output_filename)
+            logger.info(f"Saved cleaned data to: {output_path}")
+            
+        except FileNotFoundError:
+            logger.warning(f"File {filename} not found in {raw_data_dir}, skipping...")
+        except Exception as e:
+            logger.error(f"Error processing {filename}: {e}")
+    
+    logger.info("Data processing complete!")
+
+
+def main():
+    """Main function to run the ETL pipeline."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Instacart ETL Pipeline")
+    parser.add_argument(
+        "--sample", 
+        action="store_true", 
+        help="Use sample data from data/raw_sample/ instead of data/raw/"
+    )
+    parser.add_argument(
+        "--raw-dir",
+        type=str,
+        help="Custom raw data directory path"
+    )
+    parser.add_argument(
+        "--clean-dir", 
+        type=str,
+        default="data/clean",
+        help="Clean data output directory (default: data/clean)"
+    )
+    parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        default="INFO",
+        help="Set logging level (default: INFO)"
+    )
+    
+    args = parser.parse_args()
+    
+    # Configure logging
+    logging.basicConfig(
+        level=getattr(logging, args.log_level),
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    # Determine raw data directory
+    if args.raw_dir:
+        raw_data_dir = args.raw_dir
+    elif args.sample:
+        raw_data_dir = "data/raw_sample"
+        logger.info("Using sample data from data/raw_sample/")
+    else:
+        raw_data_dir = "data/raw"
+        logger.info("Using full data from data/raw/")
+    
+    # Run the ETL pipeline
+    process_instacart_data(raw_data_dir=raw_data_dir, clean_data_dir=args.clean_dir)
+
+
+if __name__ == "__main__":
+    main()
