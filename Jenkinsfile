@@ -184,13 +184,19 @@ pipeline {
               fi
             done
             
-            # Also check via command -v
+            # Also check via command -v (with proper error handling)
             if [ -z "$DOCKER_PATH" ]; then
-              if command -v docker &> /dev/null; then
-                DOCKER_PATH="$(command -v docker)"
+              # Use set +e to temporarily disable exit on error
+              set +e
+              DOCKER_CHECK=$(command -v docker 2>/dev/null)
+              DOCKER_EXIT_CODE=$?
+              set -e
+              
+              if [ $DOCKER_EXIT_CODE -eq 0 ] && [ -n "$DOCKER_CHECK" ]; then
+                DOCKER_PATH="$DOCKER_CHECK"
                 echo "✅ Docker found via command -v at: $DOCKER_PATH"
               else
-                echo "❌ Docker not found via command -v either"
+                echo "❌ Docker not found via command -v either (exit code: $DOCKER_EXIT_CODE)"
               fi
             fi
             
