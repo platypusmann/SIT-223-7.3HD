@@ -20,87 +20,89 @@ parts/
 sdist/
 var/
 wheels/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
 
-# Virtual environments
-.venv/
-venv/
-ENV/
-env/
-.env
+# PyInstaller
+*.manifest
+*.spec
 
-# Testing
-.pytest_cache/
-.coverage
-.coverage.*
-*.cover
-*.py,cover
-.hypothesis/
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
 .tox/
 .nox/
-htmlcov/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+reports/
 
-# Reports folder contents but keep folder structure
-reports/*
-!reports/.gitkeep
+# Jupyter Notebook
+.ipynb_checkpoints
 
-# Linting and formatting
-.ruff_cache/
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# mypy
 .mypy_cache/
 .dmypy.json
 dmypy.json
 
-# Data files
-data/raw/
-*.parquet
-*.csv
-*.xlsx
-*.json
+# Pyre type checker
+.pyre/
 
-# Jupyter
-*.ipynb_checkpoints/
-.ipynb_checkpoints
-
-# Logs
-*.log
-logs/
-
-# Docker
-.docker/
-*.tar
-.dockerignore
-
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS files
+# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
+
+# Project specific
+data/raw/
+*.log
+*.sqlite
+*.db
+
+# Docker
+.dockerignore
 
 # Temporary files
 *.tmp
 *.temp
 
-# Security
-*.pem
-*.key
-.env.local
-.env.production
-secrets/
+# Archive files
+*.zip
+*.tar.gz
+*.rar
 
-# CI/CD
-.scannerwork/
-sonar-project.properties.bak
+# Large data files (keep only sample data for testing)
+*.csv
+!data/sample_*.csv

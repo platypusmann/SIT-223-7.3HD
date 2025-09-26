@@ -1,0 +1,14 @@
+{
+  "timestamp": "2025-09-27T04:25:35.365630",
+  "total_records": 49688,
+  "validation_errors": [],
+  "data_quality_metrics": {
+    "completeness_ratio": 1.0,
+    "product_id_uniqueness": 1.0,
+    "valid_product_names_ratio": 1.0,
+    "avg_product_name_length": 30.832696023184674,
+    "max_product_name_length": 159.0
+  },
+  "schema_valid": true,
+  "file_size_mb": 3.96
+}

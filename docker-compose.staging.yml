@@ -1,55 +1,51 @@
 version: '3.8'
 
 services:
-  csv-clean-api:
+  instacart-api:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: instacart-api-staging
     ports:
       - "8000:8000"
     environment:
       - ENV=staging
       - LOG_LEVEL=info
-      - HOST=0.0.0.0
-      - PORT=8000
     volumes:
-      - ./data:/app/data:rw
-      - staging_logs:/app/logs
-    restart: unless-stopped
+      # Mount clean data directory for persistence
+      - ./data/clean:/app/data/clean:ro
+      # Mount reports directory for health checks
+      - ./reports:/app/reports:rw
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    restart: unless-stopped
     networks:
-      - csv-api-network
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '0.5'
-        reservations:
-          memory: 256M
-          cpus: '0.25'
+      - instacart-network
 
-  # Optional: Add a reverse proxy for production-like setup
+  # Optional: nginx reverse proxy for production-like setup
   nginx:
     image: nginx:alpine
+    container_name: instacart-nginx-staging
     ports:
       - "80:80"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - csv-clean-api
-    restart: unless-stopped
+      - instacart-api
     networks:
-      - csv-api-network
-
-volumes:
-  staging_logs:
-    driver: local
+      - instacart-network
+    profiles:
+      - with-proxy
 
 networks:
-  csv-api-network:
+  instacart-network:
     driver: bridge
+
+# Optional volumes for data persistence
+volumes:
+  instacart-data:
+    driver: local

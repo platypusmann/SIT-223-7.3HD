@@ -1,3 +1,5 @@
-"""ETL package for data cleaning and transformation."""
+"""ETL package for Instacart data processing"""
 
-__version__ = "0.1.0"
+from .clean import ETLPipeline, ValidationResult
+
+__all__ = ["ETLPipeline", "ValidationResult"]

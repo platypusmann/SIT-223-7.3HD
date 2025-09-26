@@ -1,0 +1,9 @@
+[bandit]
+# Bandit security configuration
+exclude_dirs = ["tests", "venv", ".venv", "build", "dist"]
+skips = ["B101", "B601"]  # Skip assert_used and shell_injection_process_wildcard
+# B608: hardcoded_sql_expressions (skip if needed for legitimate parameterized queries)
+
+[bandit.assert_used]
+# Skip assert statements in production code (they can be removed with -O)
+skips = ["**/tests/**", "**/test_*.py"]
