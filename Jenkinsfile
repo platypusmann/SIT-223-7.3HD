@@ -47,16 +47,40 @@ pipeline {
                 ln -sf $(which python3.11) $HOME/.local/bin/python3.11
               fi
               
-              # Check for pip3.11 or create link
+              # Check for pip3.11 or install/create it
               if ! command -v pip3.11 &> /dev/null; then
                 if python3.11 -m pip --version &> /dev/null; then
-                  echo "pip available via 'python3.11 -m pip'"
+                  echo "✅ pip available via 'python3.11 -m pip'"
                   # Create a pip3.11 wrapper script
                   echo '#!/bin/bash' > $HOME/.local/bin/pip3.11
                   echo 'python3.11 -m pip "$@"' >> $HOME/.local/bin/pip3.11
                   chmod +x $HOME/.local/bin/pip3.11
                 else
-                  echo "⚠️  pip not immediately available, will bootstrap in next stage"
+                  echo "⚠️  pip not available, attempting to install..."
+                  
+                  # Try ensurepip first
+                  if python3.11 -m ensurepip --upgrade --user 2>/dev/null; then
+                    echo "✅ pip installed via ensurepip"
+                  else
+                    echo "ensurepip failed, trying get-pip.py..."
+                    # Download and install pip
+                    curl -fsSL --retry 3 --retry-delay 5 https://bootstrap.pypa.io/get-pip.py -o get-pip.py || {
+                      echo "❌ ERROR: Cannot download get-pip.py"
+                      exit 1
+                    }
+                    
+                    python3.11 get-pip.py --user || {
+                      echo "❌ ERROR: get-pip.py installation failed"
+                      exit 1
+                    }
+                    rm -f get-pip.py
+                    echo "✅ pip installed via get-pip.py"
+                  fi
+                  
+                  # Create pip3.11 wrapper
+                  echo '#!/bin/bash' > $HOME/.local/bin/pip3.11
+                  echo 'python3.11 -m pip "$@"' >> $HOME/.local/bin/pip3.11
+                  chmod +x $HOME/.local/bin/pip3.11
                 fi
               else
                 echo "✅ pip3.11 found: $(pip3.11 --version)"
@@ -91,18 +115,44 @@ pipeline {
             
             # Check Docker
             echo "Checking Docker..."
-            if ! command -v docker &> /dev/null; then
+            
+            # Look for Docker in common locations
+            DOCKER_PATH=""
+            for docker_loc in /usr/bin/docker /usr/local/bin/docker /bin/docker; do
+              if [ -x "$docker_loc" ]; then
+                DOCKER_PATH="$docker_loc"
+                break
+              fi
+            done
+            
+            if [ -n "$DOCKER_PATH" ]; then
+              echo "✅ Docker found at: $DOCKER_PATH"
+              # Create symlink for easy access
+              ln -sf "$DOCKER_PATH" $HOME/.local/bin/docker
+              DOCKER_CMD="$DOCKER_PATH"
+            elif command -v docker &> /dev/null; then
+              echo "✅ Docker found in PATH: $(which docker)"
+              DOCKER_CMD="docker"
+            else
               echo "❌ ERROR: Docker not found!"
+              echo "Checked locations: /usr/bin/docker, /usr/local/bin/docker, /bin/docker"
+              echo "PATH: $PATH"
               echo "SOLUTION: Contact Jenkins admin to install Docker"
               exit 1
             fi
-            if ! docker info &> /dev/null; then
+            
+            # Test Docker daemon access
+            echo "Testing Docker daemon access..."
+            if ! $DOCKER_CMD info &> /dev/null; then
               echo "❌ ERROR: Docker daemon not accessible!"
               echo "Current user groups: $(groups)"
+              echo "Docker socket permissions:"
+              ls -la /var/run/docker.sock 2>/dev/null || echo "Docker socket not found"
               echo "SOLUTION: Add Jenkins user to docker group: sudo usermod -aG docker $(whoami)"
+              echo "Or ensure Docker is running and accessible"
               exit 1
             fi
-            echo "✅ Docker accessible: $(docker --version)"
+            echo "✅ Docker accessible: $($DOCKER_CMD --version)"
             
             # Check network connectivity
             echo "Checking network connectivity..."
