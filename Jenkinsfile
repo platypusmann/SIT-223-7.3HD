@@ -293,7 +293,7 @@ print('Import testing completed')
                     // Publish test results if available
                     script {
                         if (fileExists('reports/junit.xml')) {
-                            publishTestResults testResultsPattern: 'reports/junit.xml'
+                            junit testResults: 'reports/junit.xml', allowEmptyResults: true
                         }
                     }
                 }
