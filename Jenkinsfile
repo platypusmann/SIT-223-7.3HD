@@ -54,12 +54,34 @@ pipeline {
               if python3.11 -c "import pip" 2>/dev/null; then
                 echo "✅ pip module available"
               else
-                echo "⚠️  pip module not found, installing..."
+                echo "⚠️  pip module not found, checking alternatives..."
                 
-                # Try ensurepip first
+                # Check if there's a system python3 with pip that we can use
+                echo "Checking system Python alternatives..."
+                for py_cmd in python3 /usr/bin/python3 /usr/bin/python3.11; do
+                  if [ -x "$py_cmd" ] && $py_cmd -m pip --version 2>/dev/null; then
+                    echo "✅ Found working pip with: $py_cmd"
+                    echo "Version: $($py_cmd -m pip --version)"
+                    
+                    # Use this Python instead of our symlinked one
+                    ln -sf "$py_cmd" $HOME/.local/bin/python3.11
+                    echo "✅ Updated python3.11 symlink to use system Python with pip"
+                    break
+                  fi
+                done
+                
+                # Check if pip is now available after trying system Python
+                if python3.11 -c "import pip" 2>/dev/null; then
+                  echo "✅ pip module now available via system Python"
+                else
+                  echo "Still no pip available, attempting installation..."
+                  
+                  # Try ensurepip first
                 echo "Trying ensurepip..."
                 if python3.11 -m ensurepip --upgrade --user; then
                   echo "✅ pip installed via ensurepip"
+                elif python3.11 -m ensurepip --upgrade --user --break-system-packages 2>/dev/null; then
+                  echo "✅ pip installed via ensurepip (with --break-system-packages)"
                 else
                   echo "ensurepip failed, trying get-pip.py..."
                   # Download and install pip
@@ -68,13 +90,36 @@ pipeline {
                     exit 1
                   }
                   
-                  python3.11 get-pip.py --user || {
-                    echo "❌ ERROR: get-pip.py installation failed"
-                    exit 1
-                  }
+                  # Try with --break-system-packages for PEP 668 compliance
+                  if python3.11 get-pip.py --user --break-system-packages; then
+                    echo "✅ pip installed via get-pip.py (with --break-system-packages)"
+                  else
+                    echo "get-pip.py with --break-system-packages failed, trying system package manager..."
+                    
+                    # Try to install python3-pip via system package manager
+                    if command -v apt &> /dev/null; then
+                      echo "Attempting to install python3-pip via apt..."
+                      # This will likely fail without sudo, but let's try
+                      apt update && apt install -y python3-pip 2>/dev/null || {
+                        echo "❌ System package installation failed (needs sudo)"
+                      }
+                    fi
+                    
+                    # Final fallback: check if pip is available via python3-pip package
+                    if python3.11 -m pip --version 2>/dev/null; then
+                      echo "✅ pip now available via system package"
+                    else
+                      echo "❌ ERROR: All pip installation methods failed"
+                      echo "This appears to be a PEP 668 externally managed environment"
+                      echo "Solutions:"
+                      echo "1. Install python3-pip system package: apt install python3-pip"
+                      echo "2. Or run Jenkins with --break-system-packages permission"
+                      exit 1
+                    fi
+                  fi
                   rm -f get-pip.py
-                  echo "✅ pip installed via get-pip.py"
                 fi
+              fi
               fi
               
               # Verify pip is working before creating wrapper
