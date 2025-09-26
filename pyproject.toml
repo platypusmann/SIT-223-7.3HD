@@ -23,7 +23,6 @@ select = [
 ignore = [
     "E501",  # Line too long (we set line-length to handle this)
     "E203",  # Whitespace before ':' (conflicts with black)
-    "W503",  # Line break before binary operator (conflicts with black)
     "B008",  # Do not perform function calls in argument defaults (FastAPI uses this pattern)
     "T201",  # print found (allow prints in some contexts)
 ]
