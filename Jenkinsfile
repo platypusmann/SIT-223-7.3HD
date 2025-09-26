@@ -314,24 +314,24 @@ pipeline {
           # Ensure PATH includes ~/.local/bin
           export PATH="\${HOME}/.local/bin:\${PATH}"
           
-          # Upgrade pip
-          python3.11 -m pip install --upgrade pip --user --quiet
+          # Upgrade pip (with PEP 668 compliance)
+          python3.11 -m pip install --upgrade pip --user --quiet --break-system-packages
           
           # Install project dependencies
           echo "Installing project dependencies..."
           if [ -f pyproject.toml ]; then
-            python3.11 -m pip install --user -e . --quiet || {
+            python3.11 -m pip install --user -e . --quiet --break-system-packages || {
               echo "❌ ERROR: Project installation failed"
               echo "Trying individual dependency installation..."
-              python3.11 -m pip install --user fastapi uvicorn pandas pandera --quiet
+              python3.11 -m pip install --user fastapi uvicorn pandas pandera --quiet --break-system-packages
             }
           elif [ -f requirements.txt ]; then
-            python3.11 -m pip install --user -r requirements.txt --quiet
+            python3.11 -m pip install --user -r requirements.txt --quiet --break-system-packages
           fi
           
           # Install testing and development tools
           echo "Installing development tools..."
-          python3.11 -m pip install --user pytest pytest-cov ruff mypy bandit pip-audit coverage requests --quiet || {
+          python3.11 -m pip install --user pytest pytest-cov ruff mypy bandit pip-audit coverage requests --quiet --break-system-packages || {
             echo "⚠️  WARNING: Some development tools failed to install"
             echo "Continuing with available tools..."
           }
