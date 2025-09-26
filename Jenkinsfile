@@ -237,7 +237,6 @@ pipeline {
         """
       }
     }
-    }
 
     stage('Code Quality') {
       parallel {
