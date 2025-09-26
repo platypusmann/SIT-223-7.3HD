@@ -185,9 +185,13 @@ pipeline {
             done
             
             # Also check via command -v
-            if [ -z "$DOCKER_PATH" ] && command -v docker &> /dev/null; then
-              DOCKER_PATH="$(command -v docker)"
-              echo "✅ Docker found via command -v at: $DOCKER_PATH"
+            if [ -z "$DOCKER_PATH" ]; then
+              if command -v docker &> /dev/null; then
+                DOCKER_PATH="$(command -v docker)"
+                echo "✅ Docker found via command -v at: $DOCKER_PATH"
+              else
+                echo "❌ Docker not found via command -v either"
+              fi
             fi
             
             if [ -n "$DOCKER_PATH" ]; then
