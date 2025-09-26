@@ -504,15 +504,37 @@ PY
       }
       post {
         always {
-          junit 'reports/junit.xml'
-          publishHTML([
-            allowMissing: true,
-            alwaysLinkToLastBuild: true,
-            keepAll: true,
-            reportDir: 'reports/htmlcov',
-            reportFiles: 'index.html',
-            reportName: 'Coverage Report'
-          ])
+          // Publish JUnit test results (core Jenkins functionality)
+          script {
+            if (fileExists('reports/junit.xml')) {
+              junit 'reports/junit.xml'
+            } else {
+              echo "⚠️  No JUnit XML found, skipping test result publishing"
+            }
+          }
+          
+          // Publish HTML coverage report (requires HTML Publisher Plugin)
+          script {
+            try {
+              if (fileExists('reports/htmlcov/index.html')) {
+                publishHTML([
+                  allowMissing: true,
+                  alwaysLinkToLastBuild: true,
+                  keepAll: true,
+                  reportDir: 'reports/htmlcov',
+                  reportFiles: 'index.html',
+                  reportName: 'Coverage Report'
+                ])
+                echo "✅ HTML Coverage report published"
+              } else {
+                echo "⚠️  No HTML coverage report found"
+              }
+            } catch (Exception e) {
+              echo "⚠️  HTML Publisher Plugin not available: ${e.getMessage()}"
+              echo "Coverage reports are archived as artifacts instead"
+              echo "Install HTML Publisher Plugin to view coverage reports in Jenkins UI"
+            }
+          }
         }
       }
     }
