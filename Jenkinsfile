@@ -266,7 +266,7 @@ pipeline {
         sh """
           # Source Python environment if available
           if [ -f \$HOME/.jenkins_python_env ]; then
-            source \$HOME/.jenkins_python_env
+            . \$HOME/.jenkins_python_env
           fi
           
           # Bootstrap pip for Python 3.11 with better error handling
