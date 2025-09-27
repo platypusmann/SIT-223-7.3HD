@@ -1108,12 +1108,13 @@ $(git log --oneline ${PREVIOUS_TAG}..HEAD 2>/dev/null || echo "- Initial release
                     mkdir -p monitoring
                     
                     # Prometheus configuration
-                    echo "global:
+                    cat > monitoring/prometheus.yml << 'EOF'
+global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
 rule_files:
-  # - \"first_rules.yml\"
+  # - "first_rules.yml"
 
 scrape_configs:
   - job_name: 'instacart-api'
@@ -1125,104 +1126,109 @@ scrape_configs:
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
-" > monitoring/prometheus.yml
+EOF
                     
                     # Grafana dashboard configuration
-                    echo "{
-  \"dashboard\": {
-    \"id\": null,
-    \"title\": \"Instacart API Dashboard\",
-    \"tags\": [\"instacart\", \"api\"],
-    \"timezone\": \"browser\",
-    \"panels\": [
+                    cat > monitoring/grafana-dashboard.json << 'EOF'
+{
+  "dashboard": {
+    "id": null,
+    "title": "Instacart API Dashboard",
+    "tags": ["instacart", "api"],
+    "timezone": "browser",
+    "panels": [
       {
-        \"id\": 1,
-        \"title\": \"HTTP Request Rate\",
-        \"type\": \"graph\",
-        \"targets\": [
+        "id": 1,
+        "title": "HTTP Request Rate",
+        "type": "graph",
+        "targets": [
           {
-            \"expr\": \"rate(http_requests_total[5m])\",
-            \"legendFormat\": \"{{method}} {{endpoint}}\"
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "{{method}} {{endpoint}}"
           }
         ]
       },
       {
-        \"id\": 2,
-        \"title\": \"Response Times\",
-        \"type\": \"graph\",
-        \"targets\": [
+        "id": 2,
+        "title": "Response Times",
+        "type": "graph",
+        "targets": [
           {
-            \"expr\": \"histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))\",
-            \"legendFormat\": \"95th percentile\"
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "95th percentile"
           }
         ]
       },
       {
-        \"id\": 3,
-        \"title\": \"Error Rate\",
-        \"type\": \"singlestat\",
-        \"targets\": [
+        "id": 3,
+        "title": "Error Rate",
+        "type": "singlestat",
+        "targets": [
           {
-            \"expr\": \"rate(http_requests_total{status=~\\\"5..\\\"}[5m])\",
-            \"legendFormat\": \"5xx errors\"
+            "expr": "rate(http_requests_total{status=~\"5..\"}[5m])",
+            "legendFormat": "5xx errors"
           }
         ]
       }
     ],
-    \"time\": {
-      \"from\": \"now-1h\",
-      \"to\": \"now\"
+    "time": {
+      "from": "now-1h",
+      "to": "now"
     },
-    \"refresh\": \"30s\"
+    "refresh": "30s"
   }
-}" > monitoring/grafana-dashboard.json
+}
+EOF
                     
                     # Health check configuration
                     echo "Creating health monitoring setup..."
-                    echo "{
-  \"health_checks\": [
+                    cat > monitoring/health-monitoring.json << 'EOF'
+{
+  "health_checks": [
     {
-      \"name\": \"api_health\",
-      \"url\": \"http://localhost:8000/health\",
-      \"interval\": \"30s\",
-      \"timeout\": \"10s\",
-      \"expected_status\": 200
+      "name": "api_health",
+      "url": "http://localhost:8000/health",
+      "interval": "30s",
+      "timeout": "10s",
+      "expected_status": 200
     },
     {
-      \"name\": \"database_connection\",
-      \"check_type\": \"custom\",
-      \"script\": \"check_database.py\",
-      \"interval\": \"60s\"
+      "name": "database_connection",
+      "check_type": "custom",
+      "script": "check_database.py",
+      "interval": "60s"
     }
   ],
-  \"alerts\": [
+  "alerts": [
     {
-      \"name\": \"API Down\",
-      \"condition\": \"api_health.status != 200\",
-      \"notification\": \"slack\",
-      \"severity\": \"critical\"
+      "name": "API Down",
+      "condition": "api_health.status != 200",
+      "notification": "slack",
+      "severity": "critical"
     },
     {
-      \"name\": \"High Error Rate\",
-      \"condition\": \"error_rate > 0.05\",
-      \"notification\": \"email\",
-      \"severity\": \"warning\"
+      "name": "High Error Rate",
+      "condition": "error_rate > 0.05",
+      "notification": "email",
+      "severity": "warning"
     },
     {
-      \"name\": \"High Response Time\",
-      \"condition\": \"response_time_p95 > 2000\",
-      \"notification\": \"slack\",
-      \"severity\": \"warning\"
+      "name": "High Response Time",
+      "condition": "response_time_p95 > 2000",
+      "notification": "slack",
+      "severity": "warning"
     }
   ]
-}" > monitoring/health-monitoring.json
+}
+EOF
                     
                     # Start monitoring stack (if Docker available)
                     if command -v docker-compose >/dev/null 2>&1; then
                         echo "Starting monitoring stack..."
                         
                         # Create monitoring docker-compose
-                        echo "version: '3.8'
+                        cat > monitoring/docker-compose-monitoring.yml << 'EOF'
+version: '3.8'
 services:
   prometheus:
     image: prom/prometheus:latest
@@ -1258,7 +1264,7 @@ networks:
 
 volumes:
   grafana-storage:
-" > monitoring/docker-compose-monitoring.yml
+EOF
                         
                         # Start monitoring (non-blocking)
                         (cd monitoring && docker-compose -f docker-compose-monitoring.yml up -d) 2>/dev/null || echo "Monitoring stack setup completed (containers may not start in this environment)"
