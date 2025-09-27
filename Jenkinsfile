@@ -1267,48 +1267,51 @@ volumes:
 EOF
                         
                         # Start monitoring (non-blocking)
-                        (cd monitoring && docker-compose -f docker-compose-monitoring.yml up -d) 2>/dev/null || echo "Monitoring stack setup completed (containers may not start in this environment)"
+                        cd monitoring && docker-compose -f docker-compose-monitoring.yml up -d 2>/dev/null || echo "Monitoring stack setup completed - containers may not start in this environment"
+                        cd ..
                         
                     else
                         echo "Docker not available, monitoring configuration created for manual setup"
                     fi
                     
                     # Create monitoring summary
-                    echo "{
-  \"monitoring_setup\": {
-    \"prometheus\": {
-      \"configured\": true,
-      \"port\": 9090,
-      \"config_file\": \"monitoring/prometheus.yml\"
+                    cat > ${REPORTS_DIR}/monitoring-summary.json << 'EOF'
+{
+  "monitoring_setup": {
+    "prometheus": {
+      "configured": true,
+      "port": 9090,
+      "config_file": "monitoring/prometheus.yml"
     },
-    \"grafana\": {
-      \"configured\": true,
-      \"port\": 3000,
-      \"dashboard\": \"monitoring/grafana-dashboard.json\"
+    "grafana": {
+      "configured": true,
+      "port": 3000,
+      "dashboard": "monitoring/grafana-dashboard.json"
     },
-    \"health_checks\": {
-      \"configured\": true,
-      \"config_file\": \"monitoring/health-monitoring.json\"
+    "health_checks": {
+      "configured": true,
+      "config_file": "monitoring/health-monitoring.json"
     },
-    \"alerts\": {
-      \"api_down\": \"critical\",
-      \"high_error_rate\": \"warning\",
-      \"high_response_time\": \"warning\"
+    "alerts": {
+      "api_down": "critical",
+      "high_error_rate": "warning",
+      "high_response_time": "warning"
     }
   },
-  \"metrics_endpoints\": [
-    \"http://localhost:8000/metrics\",
-    \"http://localhost:8000/health\"
+  "metrics_endpoints": [
+    "http://localhost:8000/metrics",
+    "http://localhost:8000/health"
   ],
-  \"monitoring_urls\": [
-    \"http://localhost:9090 (Prometheus)\",
-    \"http://localhost:3000 (Grafana)\"
+  "monitoring_urls": [
+    "http://localhost:9090 (Prometheus)",
+    "http://localhost:3000 (Grafana)"
   ]
-}" > ${REPORTS_DIR}/monitoring-summary.json
+}
+EOF
                     
                     echo "✅ Monitoring and health checks configured"
                     echo "📊 Prometheus: http://localhost:9090"
-                    echo "📈 Grafana: http://localhost:3000 (admin/admin123)"
+                    echo "📈 Grafana: http://localhost:3000 - admin/admin123"
                 '''
             }
             
