@@ -44,6 +44,16 @@ DATA_PATH = Path("data/clean")
 CLEAN_DATA_FILE = DATA_PATH / "instacart_clean.csv"
 VALIDATION_FILE = DATA_PATH / "validation_results.json"
 
+# Import monitoring (optional - install prometheus_client if available)
+try:
+    from .monitoring import create_metrics_middleware, get_metrics, get_health_status
+    from fastapi import Response
+    MONITORING_AVAILABLE = True
+    logger.info("Monitoring capabilities enabled")
+except ImportError:
+    MONITORING_AVAILABLE = False
+    logger.info("Monitoring capabilities disabled (prometheus_client not available)")
+
 # Global data cache
 _data_cache: Optional[pd.DataFrame] = None
 _validation_cache: Optional[Dict] = None
@@ -295,6 +305,45 @@ async def root():
             "docs": "/docs"
         }
     }
+
+
+# Monitoring endpoints
+@app.get("/metrics")
+async def metrics():
+    """
+    Prometheus metrics endpoint
+    Returns application metrics in Prometheus format
+    """
+    if not MONITORING_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="Monitoring not available - prometheus_client not installed"
+        )
+    
+    metrics_data = get_metrics()
+    return Response(
+        content=metrics_data,
+        media_type="text/plain; version=0.0.4; charset=utf-8"
+    )
+
+
+@app.get("/health/detailed")
+async def detailed_health_check():
+    """
+    Detailed health check endpoint for monitoring systems
+    Returns comprehensive system health information
+    """
+    if not MONITORING_AVAILABLE:
+        # Fallback health check without monitoring
+        return {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "version": "1.0.0",
+            "environment": "production",
+            "monitoring": "disabled"
+        }
+    
+    return get_health_status()
 
 
 # Health check for container orchestration
