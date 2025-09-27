@@ -853,7 +853,10 @@ else:
     print('⚠️  Demo mode: Continuing despite test failures')
     # In production: sys.exit(1)
     sys.exit(0)
-" 2>/dev/null || echo "Integration tests completed (some failures expected in demo)"
+"
+                    if [ $? -ne 0 ]; then
+                        echo "Integration tests completed - some failures expected in demo"
+                    fi
                     
                     # Run specific integration test suite if available
                     if [ -f "tests/test_integration.py" ]; then
@@ -1267,8 +1270,14 @@ volumes:
 EOF
                         
                         # Start monitoring (non-blocking)
-                        cd monitoring && docker-compose -f docker-compose-monitoring.yml up -d 2>/dev/null || echo "Monitoring stack setup completed - containers may not start in this environment"
-                        cd ..
+                        if cd monitoring; then
+                            if ! docker-compose -f docker-compose-monitoring.yml up -d 2>/dev/null; then
+                                echo "Monitoring stack setup completed - containers may not start in this environment"
+                            fi
+                            cd ..
+                        else
+                            echo "Failed to change to monitoring directory"
+                        fi
                         
                     else
                         echo "Docker not available, monitoring configuration created for manual setup"
@@ -1303,8 +1312,8 @@ EOF
     "http://localhost:8000/health"
   ],
   "monitoring_urls": [
-    "http://localhost:9090 (Prometheus)",
-    "http://localhost:3000 (Grafana)"
+    "http://localhost:9090 - Prometheus",
+    "http://localhost:3000 - Grafana"
   ]
 }
 EOF
