@@ -433,11 +433,11 @@ else:
                             junit testResults: 'reports/junit.xml', allowEmptyResults: true, skipMarkingBuildUnstable: true
                         }
                         
-                        // Publish coverage if available
+                        // Archive coverage XML for parsing by tools
                         if (fileExists('reports/coverage.xml')) {
-                            publishCoverage adapters: [coberturaAdapter('reports/coverage.xml')], 
-                                          sourceFileResolver: sourceFiles('STORE_LAST_BUILD'),
-                                          failUnhealthy: false, failUnstable: false
+                            echo "✓ Coverage report generated and will be archived"
+                            // Note: Coverage publishing requires Code Coverage API plugin
+                            // For now, coverage.xml is archived as artifact for manual review
                         }
                     }
                     
