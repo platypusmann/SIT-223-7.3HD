@@ -105,17 +105,17 @@ class TestEndToEndPipeline:
             client = TestClient(app)
             
             # Mock the file paths to point to our temp directory
-            import app.main
-            original_clean_file = app.main.CLEAN_DATA_FILE
-            original_validation_file = app.main.VALIDATION_FILE
+            from app import main as app_main
+            original_clean_file = app_main.CLEAN_DATA_FILE
+            original_validation_file = app_main.VALIDATION_FILE
             
             try:
-                app.main.CLEAN_DATA_FILE = clean_dir / 'instacart_clean.csv'
-                app.main.VALIDATION_FILE = clean_dir / 'validation_results.json'
+                app_main.CLEAN_DATA_FILE = clean_dir / 'instacart_clean.csv'
+                app_main.VALIDATION_FILE = clean_dir / 'validation_results.json'
                 
                 # Reset cache to force reload
-                app.main._data_cache = None
-                app.main._validation_cache = None
+                app_main._data_cache = None
+                app_main._validation_cache = None
                 
                 # Test health endpoint
                 response = client.get("/health")
@@ -131,7 +131,7 @@ class TestEndToEndPipeline:
                 assert summary_data["total_records"] == 10
                 assert summary_data["total_products"] == 10
                 assert summary_data["total_aisles"] == 5
-                assert summary_data["total_departments"] == 4
+                assert summary_data["total_departments"] == 3  # Only departments referenced in products
                 
                 # Test filter endpoint
                 response = client.get("/filter?department=produce")
@@ -148,10 +148,10 @@ class TestEndToEndPipeline:
                 
             finally:
                 # Restore original file paths
-                app.main.CLEAN_DATA_FILE = original_clean_file
-                app.main.VALIDATION_FILE = original_validation_file
-                app.main._data_cache = None
-                app.main._validation_cache = None
+                app_main.CLEAN_DATA_FILE = original_clean_file
+                app_main.VALIDATION_FILE = original_validation_file
+                app_main._data_cache = None
+                app_main._validation_cache = None
     
     def test_pipeline_with_data_quality_issues(self):
         """Test pipeline behavior with data quality issues"""
@@ -252,15 +252,15 @@ class TestEndToEndPipeline:
             # Test API performance
             client = TestClient(app)
             
-            import app.main
-            original_clean_file = app.main.CLEAN_DATA_FILE
-            original_validation_file = app.main.VALIDATION_FILE
+            from app import main as app_main
+            original_clean_file = app_main.CLEAN_DATA_FILE
+            original_validation_file = app_main.VALIDATION_FILE
             
             try:
-                app.main.CLEAN_DATA_FILE = clean_file
-                app.main.VALIDATION_FILE = validation_file
-                app.main._data_cache = None
-                app.main._validation_cache = None
+                app_main.CLEAN_DATA_FILE = clean_file
+                app_main.VALIDATION_FILE = validation_file
+                app_main._data_cache = None
+                app_main._validation_cache = None
                 
                 # Test summary endpoint with large dataset
                 import time
@@ -286,7 +286,7 @@ class TestEndToEndPipeline:
                 assert len(filter_data["records"]) == 50
                 
             finally:
-                app.main.CLEAN_DATA_FILE = original_clean_file
-                app.main.VALIDATION_FILE = original_validation_file
-                app.main._data_cache = None
-                app.main._validation_cache = None
+                app_main.CLEAN_DATA_FILE = original_clean_file
+                app_main.VALIDATION_FILE = original_validation_file
+                app_main._data_cache = None
+                app_main._validation_cache = None

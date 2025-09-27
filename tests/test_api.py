@@ -75,8 +75,12 @@ class TestFastAPIApplication:
         data = response.json()
         assert data == {"ping": "pong"}
     
-    def test_health_endpoint_no_data(self, client):
+    @patch('app.main.CLEAN_DATA_FILE')
+    def test_health_endpoint_no_data(self, mock_clean_file, client):
         """Test health endpoint when no data is available"""
+        # Mock file doesn't exist
+        mock_clean_file.exists.return_value = False
+        
         response = client.get("/health")
         assert response.status_code == 200
         
@@ -123,8 +127,12 @@ class TestFastAPIApplication:
         assert data["total_aisles"] == 3
         assert data["total_departments"] == 3
     
-    def test_summary_endpoint_no_data(self, client):
+    @patch('app.main.CLEAN_DATA_FILE')
+    def test_summary_endpoint_no_data(self, mock_clean_file, client):
         """Test summary endpoint when no data is available"""
+        # Mock file doesn't exist
+        mock_clean_file.exists.return_value = False
+        
         response = client.get("/summary")
         assert response.status_code == 404
     
@@ -203,8 +211,12 @@ class TestFastAPIApplication:
         response = client.get("/filter?limit=2000")
         assert response.status_code == 422  # Validation error
     
-    def test_filter_endpoint_no_data(self, client):
+    @patch('app.main.CLEAN_DATA_FILE')
+    def test_filter_endpoint_no_data(self, mock_clean_file, client):
         """Test filter endpoint when no data is available"""
+        # Mock file doesn't exist
+        mock_clean_file.exists.return_value = False
+        
         response = client.get("/filter")
         assert response.status_code == 404
     
@@ -228,8 +240,12 @@ class TestFastAPIApplication:
         assert data["schema_valid"] is True
         assert len(data["validation_errors"]) == 0
     
-    def test_validations_endpoint_no_data(self, client):
+    @patch('app.main.VALIDATION_FILE')
+    def test_validations_endpoint_no_data(self, mock_validation_file, client):
         """Test validations endpoint when no data is available"""
+        # Mock validation file doesn't exist
+        mock_validation_file.exists.return_value = False
+        
         response = client.get("/validations/last")
         assert response.status_code == 404
     

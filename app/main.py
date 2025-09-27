@@ -204,6 +204,9 @@ async def get_summary():
             data_quality_score=round(data_quality_score, 3)
         )
         
+    except HTTPException:
+        # Re-raise HTTPExceptions (like 404 from load_data)
+        raise
     except Exception as e:
         logger.error(f"Error generating summary: {e}")
         raise HTTPException(status_code=500, detail=f"Error generating summary: {str(e)}")
