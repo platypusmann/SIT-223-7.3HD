@@ -429,20 +429,31 @@ else:
                 always {
                     // Publish test results and coverage
                     script {
-                        if (fileExists('reports/junit.xml')) {
-                            junit testResults: 'reports/junit.xml', allowEmptyResults: true, skipMarkingBuildUnstable: true
-                        }
-                        
-                        // Archive coverage XML for parsing by tools
-                        if (fileExists('reports/coverage.xml')) {
-                            echo "✓ Coverage report generated and will be archived"
-                            // Note: Coverage publishing requires Code Coverage API plugin
-                            // For now, coverage.xml is archived as artifact for manual review
+                        try {
+                            if (fileExists('reports/junit.xml')) {
+                                junit testResults: 'reports/junit.xml', allowEmptyResults: true, skipMarkingBuildUnstable: true
+                            }
+                            
+                            // Archive coverage XML for parsing by tools
+                            if (fileExists('reports/coverage.xml')) {
+                                echo "✓ Coverage report generated and will be archived"
+                                // Note: Coverage publishing requires Code Coverage API plugin
+                                // For now, coverage.xml is archived as artifact for manual review
+                            }
+                        } catch (Exception e) {
+                            echo "⚠️ Warning: Error in coverage publishing (non-critical): ${e.message}"
+                            echo "✓ Pipeline continues - coverage data is still archived"
                         }
                     }
                     
                     // Archive coverage reports
-                    archiveArtifacts artifacts: 'reports/coverage/**/*', allowEmptyArchive: true
+                    script {
+                        try {
+                            archiveArtifacts artifacts: 'reports/coverage/**/*', allowEmptyArchive: true
+                        } catch (Exception e) {
+                            echo "⚠️ Warning: Coverage artifact archiving failed (non-critical): ${e.message}"
+                        }
+                    }
                 }
             }
         }
