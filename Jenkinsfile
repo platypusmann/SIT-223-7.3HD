@@ -944,6 +944,8 @@ else:
                 anyOf {
                     branch 'main'
                     branch 'master'
+                    branch 'origin/main'
+                    branch 'origin/master'
                 }
                 not {
                     environment name: 'SKIP_PROD_DEPLOY', value: 'true'
@@ -1017,6 +1019,8 @@ else:
                 anyOf {
                     branch 'main'
                     branch 'master'
+                    branch 'origin/main'
+                    branch 'origin/master'
                 }
                 not {
                     environment name: 'SKIP_RELEASE', value: 'true'
