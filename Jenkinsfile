@@ -44,12 +44,23 @@ pipeline {
                 // Checkout code
                 checkout scm
                 
-                // Display git information
+                // Display git information and debug branch variables
                 sh '''
                     echo "Git Commit: ${GIT_COMMIT}"
                     echo "Git Branch: ${GIT_BRANCH}"
                     git log --oneline -5
                 '''
+                
+                // Debug Jenkins branch environment variables
+                script {
+                    echo "=== JENKINS BRANCH DEBUG INFO ==="
+                    echo "BRANCH_NAME: ${env.BRANCH_NAME}"
+                    echo "GIT_BRANCH: ${env.GIT_BRANCH}"  
+                    echo "GIT_LOCAL_BRANCH: ${env.GIT_LOCAL_BRANCH}"
+                    echo "CHANGE_BRANCH: ${env.CHANGE_BRANCH}"
+                    echo "All environment variables related to git/branch:"
+                    sh 'env | grep -i "git\\|branch" | sort || true'
+                }
                 
                 // Create necessary directories
                 sh '''
@@ -942,10 +953,14 @@ else:
         stage('Production Deployment') {
             when {
                 anyOf {
-                    branch 'main'
-                    branch 'master'
-                    branch 'origin/main'
-                    branch 'origin/master'
+                    expression { 
+                        return env.BRANCH_NAME == 'main' || 
+                               env.BRANCH_NAME == 'master' ||
+                               env.GIT_BRANCH == 'origin/main' ||
+                               env.GIT_BRANCH == 'origin/master' ||
+                               env.GIT_BRANCH == 'main' ||
+                               env.GIT_BRANCH == 'master'
+                    }
                 }
                 not {
                     environment name: 'SKIP_PROD_DEPLOY', value: 'true'
@@ -1017,10 +1032,14 @@ else:
         stage('Release Management') {
             when {
                 anyOf {
-                    branch 'main'
-                    branch 'master'
-                    branch 'origin/main'
-                    branch 'origin/master'
+                    expression { 
+                        return env.BRANCH_NAME == 'main' || 
+                               env.BRANCH_NAME == 'master' ||
+                               env.GIT_BRANCH == 'origin/main' ||
+                               env.GIT_BRANCH == 'origin/master' ||
+                               env.GIT_BRANCH == 'main' ||
+                               env.GIT_BRANCH == 'master'
+                    }
                 }
                 not {
                     environment name: 'SKIP_RELEASE', value: 'true'
