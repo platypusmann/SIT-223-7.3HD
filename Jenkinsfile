@@ -1054,6 +1054,11 @@ else:
                 sh '''
                     echo "Creating release for version ${VERSION}..."
                     
+                    # Configure Git user for Jenkins (required for tagging)
+                    echo "Configuring Git user identity..."
+                    git config user.name "Ranveer"
+                    git config user.email "s224507654@deakin.edu.au"
+                    
                     # Create git tag for release
                     echo "Creating Git tag..."
                     if git tag -l "v${VERSION}" | grep -q "v${VERSION}"; then
