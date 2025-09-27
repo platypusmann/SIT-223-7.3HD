@@ -427,32 +427,35 @@ else:
             
             post {
                 always {
-                    // Publish test results and coverage
                     script {
+                        echo "=== POST-TEST ACTIONS ==="
                         try {
+                            // Publish test results safely
                             if (fileExists('reports/junit.xml')) {
+                                echo "✓ Publishing test results"
                                 junit testResults: 'reports/junit.xml', allowEmptyResults: true, skipMarkingBuildUnstable: true
-                            }
-                            
-                            // Archive coverage XML for parsing by tools
-                            if (fileExists('reports/coverage.xml')) {
-                                echo "✓ Coverage report generated and will be archived"
-                                // Note: Coverage publishing requires Code Coverage API plugin
-                                // For now, coverage.xml is archived as artifact for manual review
+                            } else {
+                                echo "⚠️ No JUnit XML found"
                             }
                         } catch (Exception e) {
-                            echo "⚠️ Warning: Error in coverage publishing (non-critical): ${e.message}"
-                            echo "✓ Pipeline continues - coverage data is still archived"
+                            echo "⚠️ Test result publishing failed (non-critical): ${e.message}"
                         }
-                    }
-                    
-                    // Archive coverage reports
-                    script {
+                        
                         try {
-                            archiveArtifacts artifacts: 'reports/coverage/**/*', allowEmptyArchive: true
+                            // Archive coverage reports safely
+                            if (fileExists('reports/coverage.xml')) {
+                                echo "✓ Archiving coverage XML report"
+                                archiveArtifacts artifacts: 'reports/coverage.xml', allowEmptyArchive: true
+                            }
+                            if (fileExists('reports/coverage/')) {
+                                echo "✓ Archiving coverage HTML reports"
+                                archiveArtifacts artifacts: 'reports/coverage/**/*', allowEmptyArchive: true
+                            }
                         } catch (Exception e) {
-                            echo "⚠️ Warning: Coverage artifact archiving failed (non-critical): ${e.message}"
+                            echo "⚠️ Coverage archiving failed (non-critical): ${e.message}"
                         }
+                        
+                        echo "✓ Post-test actions completed"
                     }
                 }
             }
